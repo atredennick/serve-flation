@@ -1,0 +1,53 @@
+---
+title: "Analysis of serve-flation"
+author: "Andrew Tredennick"
+format: html
+---
+
+## Libraries
+
+```{r libraries}
+library(tidyverse)
+library(here)
+library(deuce)
+```
+
+## Load and tidy serve speed data from *deuce* package
+
+### Get the `gs_point_by_point` data from *deuce*
+```{r data}
+data("gs_point_by_point")
+dat <- gs_point_by_point
+rm(gs_point_by_point)
+```
+
+### Filter data to WTA (Women's Tennis Association) Tour
+```{r wta}
+wta <- dat |>
+  mutate(is_wta = str_detect(player1id, "wta")) %>%
+  filter(is_wta == TRUE)
+```
+
+### Filter to first serves
+```{r serves}
+serves <- wta |>
+  dplyr::mutate(
+    ServeNumber = ifelse((is.na(ServeNumber) | ServeNumber == 0) &
+                         (P1FirstSrvIn == 1 | P2FirstSrvIn == 1), 1,
+                         ifelse((is.na(ServeNumber) | ServeNumber == 0), 2, ServeNumber))
+  )
+```
+
+
+```{r}
+1 + 1
+```
+
+You can add options to executable code like this 
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
