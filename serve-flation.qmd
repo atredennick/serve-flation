@@ -24,18 +24,27 @@ rm(gs_point_by_point)
 ### Filter data to WTA (Women's Tennis Association) Tour
 ```{r wta}
 wta <- dat |>
-  mutate(is_wta = str_detect(player1id, "wta")) %>%
-  filter(is_wta == TRUE)
+  mutate(is_wta = str_detect(player1id, "wta")) |>
+  filter(is_wta == TRUE) |>
+  dplyr::select(match_id,
+                player1,
+                player2,
+                ServeNumber,
+                P1FirstSrvIn,
+                P2FirstSrvIn,
+                Speed_MPH)
 ```
 
 ### Filter to first serves
 ```{r serves}
 serves <- wta |>
-  dplyr::mutate(
-    ServeNumber = ifelse((is.na(ServeNumber) | ServeNumber == 0) &
-                         (P1FirstSrvIn == 1 | P2FirstSrvIn == 1), 1,
-                         ifelse((is.na(ServeNumber) | ServeNumber == 0), 2, ServeNumber))
-  )
+  dplyr::mutate(ServeNumber = ifelse((is.na(ServeNumber) |
+                                        ServeNumber == 0) &
+                                       (P1FirstSrvIn == 1 | P2FirstSrvIn == 1),
+                                     1,
+                                     ifelse((is.na(ServeNumber) |
+                                               ServeNumber == 0), 2, ServeNumber)
+  ))
 ```
 
 
