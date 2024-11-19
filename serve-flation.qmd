@@ -9,30 +9,21 @@ format: html
 ```{r libraries}
 library(tidyverse)
 library(here)
-library(deuce)
+library(arrow)
 ```
+
 
 ## Load and tidy serve speed data from *deuce* package
 
-### Get the `gs_point_by_point` data from *deuce*
+### Load data
 ```{r data}
-data("gs_point_by_point")
-dat <- gs_point_by_point
-rm(gs_point_by_point)
+serve_data <- read_parquet(here("data", "serve_data.parquet"))
 ```
 
 ### Filter data to WTA (Women's Tennis Association) Tour
 ```{r wta}
-wta <- dat |>
-  mutate(is_wta = str_detect(player1id, "wta")) |>
-  filter(is_wta == TRUE) |>
-  dplyr::select(match_id,
-                player1,
-                player2,
-                ServeNumber,
-                P1FirstSrvIn,
-                P2FirstSrvIn,
-                Speed_MPH)
+wta <- serve_data |>
+  filter(tour == "WTA")
 ```
 
 ### Filter to first serves
