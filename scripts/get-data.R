@@ -37,12 +37,12 @@ get_csv_files <- function(api_url) {
   contents <- fromJSON(content(response, as = "text"))
   
   # separate files and directories
-  files <- contents %>%
-    filter(type == "file" & grepl("\\.csv$", name)) %>% 
+  files <- contents |>
+    filter(type == "file" & grepl("\\.csv$", name)) |>
     pull(name)
   
-  subdirs <- contents %>%
-    filter(type == "dir") %>%
+  subdirs <- contents |>
+    filter(type == "dir") |>
     pull(url)
   
   # recursively fetch files from subdirectories
@@ -53,7 +53,7 @@ get_csv_files <- function(api_url) {
   return(files)
 }
 
-# Fetch all .csv files from the repository
+# get all .csv files from the repository
 csv_files <- get_csv_files(repo_api_url)
 
 # filter out unwanted files
