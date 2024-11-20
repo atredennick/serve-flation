@@ -32,15 +32,36 @@ iga_points <- serve_data |>
   )) |>
   dplyr::select(match_id, slam, year, server = PointServer, speed_kmh = Speed_KMH) |>
   mutate(server = case_when(
-    str_detect(server, "Swiatek") ~ "Iga",
+    str_detect(server, "Swiatek") ~ "iga",
     TRUE ~ "field")
   ) |>
   filter(year > 2020, slam %in% c("usopen", "wimbledon"))
 
-ggplot(iga_points, aes(x = factor(year), y = speed_kmh, color = server)) +
-  geom_point(position = position_dodge(1)) +
-  geom_boxplot(position = position_dodge(1), alpha = 0.2) +
-  facet_wrap(~slam)
+# from On Cloud (ON) color pallette: https://www.on.com
+color_map <- c("iga" = "#FC63CE", "field" = "#27414F")
+
+ggplot(iga_points,
+       aes(
+         x = factor(year),
+         y = speed_kmh,
+         fill = server,
+         color = server
+       )) +
+  geom_dotplot(
+    binaxis = 'y',
+    dotsize = 0.5,
+    stackdir = 'center',
+    position = position_dodge(0.8),
+    alpha = 0.3
+  ) +
+  geom_boxplot(position = position_dodge(0.8),
+               alpha = 0.2,
+               width = 0.2) +
+  facet_wrap( ~ slam, ncol = 1) +
+  scale_color_manual(values = color_map) +
+  scale_fill_manual(values = color_map) +
+  labs(x = "Year", y = "First serve speed (km/h)") +
+  theme_minimal()
 
 lm(speed_kmh ~ server*factor(year), data = iga_points) |> summary()
 ```
