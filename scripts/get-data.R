@@ -93,6 +93,7 @@ read_data_points <- function(.fname) {
                   PointServer,
                   P1FirstSrvIn,
                   P2FirstSrvIn,
+                  Speed_KMH,
                   Speed_MPH) |>
     as_tibble()
 }

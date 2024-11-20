@@ -22,13 +22,32 @@ serve_data <- read_parquet(here("data", "serve_data.parquet"))
 
 ### Filter data to WTA (Women's Tennis Association) Tour
 ```{r wta}
-wta <- serve_data |>
-  filter(tour == "WTA")
+iga_points <- serve_data |>
+  filter(str_detect(player1, "Swiatek") | str_detect(player2, "Swiatek")) |>
+  filter(Speed_KMH > 0 & !is.na(Speed_KMH)) |>
+  mutate(PointServer = case_when(
+    PointServer == 1 ~ player1,
+    PointServer == 2 ~ player2,
+    TRUE ~ NA_character_
+  )) |>
+  dplyr::select(match_id, slam, year, server = PointServer, speed_kmh = Speed_KMH) |>
+  mutate(server = case_when(
+    str_detect(server, "Swiatek") ~ "Iga",
+    TRUE ~ "field")
+  ) |>
+  filter(year > 2020, slam %in% c("usopen", "wimbledon"))
+
+ggplot(iga_points, aes(x = factor(year), y = speed_kmh, color = server)) +
+  geom_point(position = position_dodge(1)) +
+  geom_boxplot(position = position_dodge(1), alpha = 0.2) +
+  facet_wrap(~slam)
+
+lm(speed_kmh ~ server*factor(year), data = iga_points) |> summary()
 ```
 
 ### Filter to first serves
 ```{r serves}
-serves <- wta |>
+serves <- iga |>
   dplyr::mutate(ServeNumber = ifelse((is.na(ServeNumber) |
                                         ServeNumber == 0) &
                                        (P1FirstSrvIn == 1 | P2FirstSrvIn == 1),
