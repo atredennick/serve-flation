@@ -155,3 +155,21 @@ delta_plot <- ggplot(deltas, aes(x = delta, y = year, fill = year, group = year)
         axis.title = element_text(face = "bold"))
 ggsave(here("figures", "deltas.pdf"), plot = delta_plot, width = 6, height = 4)
 ```
+
+
+formula <- serve_speed ~ server * year + slam  # Predict serve speed with server, year, and slam, plus interaction
+
+# Fit the Weibull distribution model with horseshoe priors
+fit_weibull_horseshoe <- brm(
+  formula = formula,           # Model serve_speed as a function of server, year, and slam
+  family = weibull(),          # Use the Weibull distribution
+  data = your_data,            # Your dataset containing serve speeds
+  prior = c(
+    prior(horseshoe(1), class = "b"),   # Horseshoe prior for regression coefficients
+    prior(lognormal(0, 1), class = "Intercept"),  # Prior for the intercept term
+    prior(lognormal(0, 1), class = "sd")   # Prior for the scale parameter (optional)
+  ),
+  chains = 4,                  # Number of chains
+  cores = 4,                   # Number of cores for parallel processing
+  iter = 2000                  # Number of iterations
+)
