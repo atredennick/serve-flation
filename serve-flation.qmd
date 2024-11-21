@@ -13,38 +13,91 @@ library(arrow)
 library(brms)
 library(tidybayes)
 library(ggridges)
+library(showtext)
 ```
 
+```{r settings}
+showtext_auto()  # automatically use showtext for rendering
+font_add_google("Oswald", "myfont")
 
-## Load and tidy serve speed data from *deuce* package
+theme_custom <- theme_minimal(base_size = 14) +
+  theme(
+    text = element_text(family = "myfont", color = "#333333"),
+    plot.background = element_rect(fill = "#F7F7F7", color = NA),
+    panel.background = element_rect(fill = "#F7F7F7", color = NA),
+    legend.position = "top",  # Place the legend above the plot
+    legend.direction = "horizontal",  # Arrange the legend items horizontally
+    legend.justification = "left",  # Left-align the legend
+    legend.box = "horizontal",  # Ensure the legend box is placed horizontally
+    legend.box.just = "left",  # Left justify the legend box
+    legend.background = element_blank(),  # Transparent background for the legend
+    legend.box.background = element_blank()  # Optional: transparent box background
+  )
+theme_set(theme_custom)
+```
 
-### Load data
+# Data
+
+## Function to pre-process serve data
+This function takes the full serve dataset and subsets to a player of interest based on their surname (last name).
+The player of interest is specifically identified as the server when the record is for their serve.
+All other servers (every one of their opponents in the dataset) are collectively defined as "Opponents."
+
+```{r data-fxn}
+process_player_data <- function(data, surname, idname) {
+  # filter data
+  data <- data |>
+    filter(
+      (str_detect(player1, surname) | str_detect(player2, surname)) &
+      Speed_KMH > 0 & !is.na(Speed_KMH)
+    ) |>
+    mutate(
+      PointServer = case_when(
+        PointServer == 1 ~ player1,
+        PointServer == 2 ~ player2,
+        TRUE ~ NA_character_
+      )
+    )
+  
+  # transform and select relevant columns
+  data <- data |>
+    mutate(
+      server = case_when(
+        str_detect(PointServer, surname) ~ idname,
+        TRUE ~ "Opponents"
+      )
+    ) |>
+    filter(year > 2020, slam %in% c("usopen", "wimbledon")) |>
+    dplyr::select(
+      match_id, slam, year,
+      server, speed_kmh = Speed_KMH
+    )
+  
+  # format columns for analysis
+  data <- data |>
+    mutate(
+      year = factor(year),
+      server = factor(server, levels = c(idname, "Opponents"))
+    )
+  
+  return(data)
+}
+
+```
+
+## Load data and process
 ```{r data}
 serve_data <- read_parquet(here("data", "serve_data.parquet"))
+iga_data <- process_player_data(serve_data, "Swiatek", "Iga")
 ```
+
+
 
 ### Filter data to WTA (Women's Tennis Association) Tour
 ```{r wta}
-iga_points <- serve_data |>
-  filter(str_detect(player1, "Swiatek") | str_detect(player2, "Swiatek")) |>
-  filter(Speed_KMH > 0 & !is.na(Speed_KMH)) |>
-  mutate(PointServer = case_when(
-    PointServer == 1 ~ player1,
-    PointServer == 2 ~ player2,
-    TRUE ~ NA_character_
-  )) |>
-  dplyr::select(match_id, slam, year, server = PointServer, speed_kmh = Speed_KMH) |>
-  mutate(server = case_when(
-    str_detect(server, "Swiatek") ~ "iga",
-    TRUE ~ "field")
-  ) |>
-  filter(year > 2020, slam %in% c("usopen", "wimbledon")) |>
-  mutate(year = factor(year),
-         server = factor(server, levels = c("iga", "field")))
-
 # from On Cloud (ON) color pallette: https://www.on.com
-color_map <- c("iga" = "#FC63CE", "field" = "#27414F")
-
+color_map <- c(Iga = "#FC63CE", Opponents = "#27414F")
+facet_map <- c(usopen = "US Open", wimbledon = "Wimbledon")
 ggplot(iga_points,
        aes(
          x = factor(year),
@@ -54,19 +107,23 @@ ggplot(iga_points,
        )) +
   geom_dotplot(
     binaxis = 'y',
+    binwidth = 2,
     dotsize = 0.5,
     stackdir = 'center',
-    position = position_dodge(0.7),
+    position = position_dodge(0.5),
     alpha = 0.3
   ) +
-  geom_boxplot(position = position_dodge(0.7),
+  geom_boxplot(position = position_dodge(0.5),
                alpha = 0.2,
-               width = 0.5) +
-  facet_wrap( ~ slam, ncol = 1) +
-  scale_color_manual(values = color_map) +
-  scale_fill_manual(values = color_map) +
-  labs(x = "Year", y = "First serve speed (km/h)") +
-  theme_minimal()
+               width = 0.3,
+               outlier.shape = NA) +
+  facet_wrap( ~ slam, ncol = 1, labeller = as_labeller(facet_map)) +
+  scale_color_manual(values = color_map, name = NULL) +
+  scale_fill_manual(values = color_map, name = NULL) +
+  labs(x = "Year", y = "First serve speed (km/h)")
+
+
+
 
 fit <- brm(speed_kmh ~ server*year + slam, data = iga_points)
 newdata <- tibble(server = unique(iga_points$server)) |>
