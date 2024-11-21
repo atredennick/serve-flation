@@ -98,7 +98,7 @@ iga_data <- process_player_data(serve_data, "Swiatek", "Iga")
 # from On Cloud (ON) color pallette: https://www.on.com
 color_map <- c(Iga = "#FC63CE", Opponents = "#27414F")
 facet_map <- c(usopen = "US Open", wimbledon = "Wimbledon")
-ggplot(iga_points,
+eda <- ggplot(iga_data,
        aes(
          x = factor(year),
          y = speed_kmh,
@@ -121,15 +121,72 @@ ggplot(iga_points,
   scale_color_manual(values = color_map, name = NULL) +
   scale_fill_manual(values = color_map, name = NULL) +
   labs(x = "Year", y = "First serve speed (km/h)")
+ggsave(here("figures", "speed-data.pdf"), plot = eda, height = 5, width = 6)
+```
 
 
-
-
-fit <- brm(speed_kmh ~ server*year + slam, data = iga_points)
-newdata <- tibble(server = unique(iga_points$server)) |>
-  crossing(tibble(year = unique(iga_points$year))) |>
-  crossing(tibble(slam = unique(iga_points$slam)))
+```{r fit}
+fit <- brm(speed_kmh ~ server*year + slam, data = iga_data, family = weibull())
+newdata <- tibble(server = unique(iga_data$server)) |>
+  crossing(tibble(year = unique(iga_data$year))) |>
+  crossing(tibble(slam = unique(iga_data$slam)))
 preds <- add_epred_draws(newdata, object = fit)
+```
+
+## Is Iga's serve getting faster?
+```{r}
+colors <- c("#D1D1D1", "#B8A89D", "#8E7F6C", "#707070") 
+preds |>
+  ungroup () |>
+  dplyr::select(server, year, .epred, .draw) |>
+  group_by(server, year, .draw) |>
+  summarise(speed = mean(.epred), .groups = "drop") |>
+  ungroup() |>
+  filter(server == "Iga") |>
+  pivot_wider(names_from = year, values_from = speed) |>
+  pivot_longer(cols = `2022`:`2024`) |>
+  mutate(delta = value - `2021`) |>
+  ggplot(aes(x = delta, y = name, fill = name)) +
+  geom_vline(aes(xintercept = 0), linetype = 2) +
+  geom_density_ridges(alpha = 0.75, color = NA, bandwidth = 0.5) +
+  scale_fill_manual(values = colors[2:4]) +
+  coord_cartesian(xlim = c(-5, 10)) +
+  labs(
+    x = "Iga's first serve speed increase/decrease relative to 2021 (km/h)",
+    y = NULL,
+    caption = "\n\nPosterior distributions averaged over\nUS Open and Wimbledon serve speeds."
+  ) +
+  guides(fill = "none") 
+```
+
+## Are Iga's opponent's serves getting faster?
+```{r}
+preds |>
+  ungroup () |>
+  dplyr::select(server, year, .epred, .draw) |>
+  group_by(server, year, .draw) |>
+  summarise(speed = mean(.epred), .groups = "drop") |>
+  ungroup() |>
+  filter(server == "Opponents") |>
+  pivot_wider(names_from = year, values_from = speed) |>
+  pivot_longer(cols = `2022`:`2024`) |>
+  mutate(delta = value - `2021`) |>
+  ggplot(aes(x = delta, y = name, fill = name)) +
+  geom_vline(aes(xintercept = 0), linetype = 2) +
+  geom_density_ridges(alpha = 0.75, color = NA, bandwidth = 0.5) +
+  scale_fill_manual(values = colors[2:4]) +
+  coord_cartesian(xlim = c(-5, 10)) +
+  labs(
+    x = "Opponents's first serve speed increase/decrease relative to 2021 (km/h)",
+    y = NULL,
+    caption = "\n\nPosterior distributions averaged over\nUS Open and Wimbledon serve speeds."
+  ) +
+  guides(fill = "none")
+```
+
+
+## Is Iga keeping up with serve-flation?
+```{r}
 deltas <- preds |>
   ungroup () |>
   dplyr::select(server, year, .epred, .draw) |>
@@ -137,9 +194,8 @@ deltas <- preds |>
   summarise(speed = mean(.epred), .groups = "drop") |>
   ungroup() |>
   pivot_wider(names_from = server, values_from = speed) |>
-  mutate(delta = iga - field)
+  mutate(delta = Iga - Opponents)
 
-colors <- c("#D1D1D1", "#B8A89D", "#8E7F6C", "#707070") 
 delta_plot <- ggplot(deltas, aes(x = delta, y = year, fill = year, group = year)) +
   geom_vline(aes(xintercept = 0), linetype = 2) +
   geom_density_ridges(alpha = 0.75, color = NA, bandwidth = 0.5) +
@@ -147,29 +203,8 @@ delta_plot <- ggplot(deltas, aes(x = delta, y = year, fill = year, group = year)
   labs(
     x = "Iga's speed advantage (km/h)",
     y = NULL,
-    caption = "\n\nPosterior predicitive distributions averaged over\nUS Open and Wimbledon serve speeds."
+    caption = "\n\nPosterior distributions averaged over\nUS Open and Wimbledon serve speeds."
   ) +
-  theme_minimal(base_size = 14) +
-  guides(fill = "none") +
-  theme(text = element_text(family = "raleway"),
-        axis.title = element_text(face = "bold"))
+  guides(fill = "none") 
 ggsave(here("figures", "deltas.pdf"), plot = delta_plot, width = 6, height = 4)
 ```
-
-
-formula <- serve_speed ~ server * year + slam  # Predict serve speed with server, year, and slam, plus interaction
-
-# Fit the Weibull distribution model with horseshoe priors
-fit_weibull_horseshoe <- brm(
-  formula = formula,           # Model serve_speed as a function of server, year, and slam
-  family = weibull(),          # Use the Weibull distribution
-  data = your_data,            # Your dataset containing serve speeds
-  prior = c(
-    prior(horseshoe(1), class = "b"),   # Horseshoe prior for regression coefficients
-    prior(lognormal(0, 1), class = "Intercept"),  # Prior for the intercept term
-    prior(lognormal(0, 1), class = "sd")   # Prior for the scale parameter (optional)
-  ),
-  chains = 4,                  # Number of chains
-  cores = 4,                   # Number of cores for parallel processing
-  iter = 2000                  # Number of iterations
-)
