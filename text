@@ -1,0 +1,39 @@
+Is Iga Świątek keeping up with serve-flation?
+
+I like to peruse the The Athletic every morning over coffee, especially their great tennis coverage. A couple days ago they published an article (paywall) about Iga Świątek's new coach and how one thing she has been working on is a faster first serve. The Athletic showed a figure of Iga's average first serve speed over the past several French Open's. It had indeed increased over time. The figure raised more questions than it answered (granted, serve speeds were not the main topic of the article).
+
+Is Iga's serve speed increasing at other Grand Slams? Are her opponent's serve speed also increasing? Is Iga's serve speed increasing faster than her opponents? It's one thing for serve speed to increase, but it doesn't mean much if everyone else is increasing speed even more. You have to keep up with serve-flation.
+
+It turns out the hardest part about answering this question is getting data, which appear to be state secrets. Eventually, I found complete enough data to run an analysis that comprise Iga's matches from the US Open and Wimbledon from 2021 to 2024.
+
+
+Distributions of first and second serves from the US Open and Wimbledon from 2021 to 2024. All data are from matches in which Iga Świątek played.
+After running a quick analysis, here's what I found.
+
+Iga's serve speeds are getting faster. Except for a dip in 2022, relative to 2022, Iga has increased her serve speed in 2023 and 2024. By 2024, her serve speed was about 5 km/h faster than in 2021, at least for the data I analyzed.
+
+
+Iga Świątek's average serve speed changes over time, relative to 2021.
+Iga's opponent's serves are getting faster, too. But the increase seemed to stabilize after a step-change in 2022. Since 2022, the distributions of average serve speed are about the same.
+
+
+Iga Swiatek's opponent's average serve speed changes over time, relative to 2021.
+Iga is beating serve-flation. Besides her dip in 2022, where she merely fell back to average, Iga has been gaining on her opponents. She had a >5 km/h advantage in two 2024's Grand Slams.
+
+
+Iga Świątek's speed advantage (predicted average serve speed minus opponent's average serve speed) over time.
+So, curiosity satisfied after, probably, too much work. Iga is definitely keeping up with serve-flation and is, in fact, beating it. A couple notes though:
+
+I couldn't separate out first and second serves because the data are too limited. If Iga's opponents were missing more first serves than her (or vice versa) then these results are biased.
+
+The analysis accounted for a server (Iga or opponent) by year interaction and an additive effect of Grand Slam (US Open or WImbledon) in case technology differed among the tournaments.
+
+These comparisons are just for opponents that Iga played, meaning the sample size for other individual players is limited. It would be better to grab all the matches played by, for example Aryna Sabalenka, and do a head-to-head comparison. This proved difficult given the state of tennis data (and the state of my level of effort).
+
+If anyone wants to build on this and make it better, the full analysis is on my GitHub.
+
+Top image: Tennis Ball Stock photos by Vecteezy
+
+Analysis code: https://github.com/atredennick/serve-flation
+
+Data source: https://github.com/JeffSackmann/tennis_slam_pointbypoint, which I cam across thanks to Stephanie Kovalchik's deuce R package.
