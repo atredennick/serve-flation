@@ -4,7 +4,7 @@ author: "Andrew Tredennick"
 format: html
 ---
 
-## Libraries
+# Libraries and settings
 
 ```{r libraries}
 library(tidyverse)
@@ -25,15 +25,19 @@ theme_custom <- theme_minimal(base_size = 14) +
     text = element_text(family = "myfont", color = "#333333"),
     plot.background = element_rect(fill = "#F7F7F7", color = NA),
     panel.background = element_rect(fill = "#F7F7F7", color = NA),
-    legend.position = "top",  # Place the legend above the plot
-    legend.direction = "horizontal",  # Arrange the legend items horizontally
-    legend.justification = "left",  # Left-align the legend
-    legend.box = "horizontal",  # Ensure the legend box is placed horizontally
-    legend.box.just = "left",  # Left justify the legend box
-    legend.background = element_blank(),  # Transparent background for the legend
-    legend.box.background = element_blank()  # Optional: transparent box background
+    legend.position = "top",  
+    legend.direction = "horizontal",  
+    legend.justification = "left", 
+    legend.box = "horizontal",
+    legend.box.just = "left",  
+    legend.background = element_blank(),
+    legend.box.background = element_blank()
   )
 theme_set(theme_custom)
+
+# from On Cloud (ON) color pallette: https://www.on.com
+color_map2 <- c(Iga = "#FC63CE", Opponents = "#27414F")
+color_map4 <- c("#D1D1D1", "#B8A89D", "#8E7F6C", "#707070") 
 ```
 
 # Data
@@ -91,12 +95,8 @@ serve_data <- read_parquet(here("data", "serve_data.parquet"))
 iga_data <- process_player_data(serve_data, "Swiatek", "Iga")
 ```
 
-
-
-### Filter data to WTA (Women's Tennis Association) Tour
+## Plot serve speeds over time by slam
 ```{r wta}
-# from On Cloud (ON) color pallette: https://www.on.com
-color_map <- c(Iga = "#FC63CE", Opponents = "#27414F")
 facet_map <- c(usopen = "US Open", wimbledon = "Wimbledon")
 eda <- ggplot(iga_data,
        aes(
@@ -118,25 +118,44 @@ eda <- ggplot(iga_data,
                width = 0.3,
                outlier.shape = NA) +
   facet_wrap( ~ slam, ncol = 1, labeller = as_labeller(facet_map)) +
-  scale_color_manual(values = color_map, name = NULL) +
-  scale_fill_manual(values = color_map, name = NULL) +
-  labs(x = "Year", y = "First serve speed (km/h)")
+  scale_color_manual(values = color_map2, name = NULL) +
+  scale_fill_manual(values = color_map2, name = NULL) +
+  labs(x = "Year", y = "Serve speed (km/h)")
+
 ggsave(here("figures", "speed-data.pdf"), plot = eda, height = 5, width = 6)
 ```
 
 
+# Model
+
+## Fit regression model
+Fit a simple model of serve speeds with a year-by-server interaction and an additive effect os slam (in case there is systematic bias due to technology at each venue).
+Using a weuibull to maybe capture some skew in observations.
 ```{r fit}
-fit <- brm(speed_kmh ~ server*year + slam, data = iga_data, family = weibull())
+fit <- brm(speed_kmh ~ server*year + slam, 
+           data = iga_data, 
+           family = weibull(), 
+           chains = 4, 
+           cores = 4, 
+           warmup = 1000, 
+           iter = 2000, 
+           seed = 20241121)
+```
+
+## Generate model expectations for inference
+```{r preds}
 newdata <- tibble(server = unique(iga_data$server)) |>
   crossing(tibble(year = unique(iga_data$year))) |>
   crossing(tibble(slam = unique(iga_data$slam)))
+
 preds <- add_epred_draws(newdata, object = fit)
 ```
 
+# Model inference
+
 ## Is Iga's serve getting faster?
 ```{r}
-colors <- c("#D1D1D1", "#B8A89D", "#8E7F6C", "#707070") 
-preds |>
+iga_over_time <- preds |>
   ungroup () |>
   dplyr::select(server, year, .epred, .draw) |>
   group_by(server, year, .draw) |>
@@ -145,23 +164,28 @@ preds |>
   filter(server == "Iga") |>
   pivot_wider(names_from = year, values_from = speed) |>
   pivot_longer(cols = `2022`:`2024`) |>
-  mutate(delta = value - `2021`) |>
-  ggplot(aes(x = delta, y = name, fill = name)) +
+  mutate(delta = value - `2021`)
+
+iga_time_plot <- ggplot(data = iga_over_time, aes(x = delta, y = name, fill = name)) +
   geom_vline(aes(xintercept = 0), linetype = 2) +
-  geom_density_ridges(alpha = 0.75, color = NA, bandwidth = 0.5) +
-  scale_fill_manual(values = colors[2:4]) +
+  geom_density_ridges(alpha = 0.75,
+                      color = NA,
+                      bandwidth = 0.5) +
+  scale_fill_manual(values = color_map4[2:4]) +
   coord_cartesian(xlim = c(-5, 10)) +
-  labs(
-    x = "Iga's first serve speed increase/decrease relative to 2021 (km/h)",
-    y = NULL,
-    caption = "\n\nPosterior distributions averaged over\nUS Open and Wimbledon serve speeds."
-  ) +
+  labs(x = "Iga's serve speed increase/decrease relative to 2021 (km/h)", 
+       y = NULL, 
+       caption = "\n\nPosterior distributions averaged over\nUS Open and Wimbledon serve speeds.") +
   guides(fill = "none") 
+
+ggsave(here("figures", "iga_over_time.pdf"), iga_time_plot, width = 6, height = 4)
 ```
+
+Yes, except for dip in 2022.
 
 ## Are Iga's opponent's serves getting faster?
 ```{r}
-preds |>
+opp_over_time <- preds |>
   ungroup () |>
   dplyr::select(server, year, .epred, .draw) |>
   group_by(server, year, .draw) |>
@@ -170,20 +194,24 @@ preds |>
   filter(server == "Opponents") |>
   pivot_wider(names_from = year, values_from = speed) |>
   pivot_longer(cols = `2022`:`2024`) |>
-  mutate(delta = value - `2021`) |>
-  ggplot(aes(x = delta, y = name, fill = name)) +
+  mutate(delta = value - `2021`)
+
+opp_time_plot <- ggplot(data = opp_over_time, aes(x = delta, y = name, fill = name)) +
   geom_vline(aes(xintercept = 0), linetype = 2) +
   geom_density_ridges(alpha = 0.75, color = NA, bandwidth = 0.5) +
-  scale_fill_manual(values = colors[2:4]) +
+  scale_fill_manual(values = color_map4[2:4]) +
   coord_cartesian(xlim = c(-5, 10)) +
   labs(
-    x = "Opponents's first serve speed increase/decrease relative to 2021 (km/h)",
+    x = "Opponents's serve speed increase/decrease relative to 2021 (km/h)",
     y = NULL,
     caption = "\n\nPosterior distributions averaged over\nUS Open and Wimbledon serve speeds."
   ) +
   guides(fill = "none")
+
+ggsave(here("figures", "opp_over_time.pdf"), opp_time_plot, width = 6, height = 4)
 ```
 
+Yes, but really just a step-change from 2021, then pretty constant.
 
 ## Is Iga keeping up with serve-flation?
 ```{r}
@@ -199,7 +227,7 @@ deltas <- preds |>
 delta_plot <- ggplot(deltas, aes(x = delta, y = year, fill = year, group = year)) +
   geom_vline(aes(xintercept = 0), linetype = 2) +
   geom_density_ridges(alpha = 0.75, color = NA, bandwidth = 0.5) +
-  scale_fill_manual(values = colors) +
+  scale_fill_manual(values = color_map4) +
   labs(
     x = "Iga's speed advantage (km/h)",
     y = NULL,
@@ -208,3 +236,5 @@ delta_plot <- ggplot(deltas, aes(x = delta, y = year, fill = year, group = year)
   guides(fill = "none") 
 ggsave(here("figures", "deltas.pdf"), plot = delta_plot, width = 6, height = 4)
 ```
+
+Yes, Iga is actually gaining ground each year.
