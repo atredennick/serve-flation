@@ -95,6 +95,7 @@ read_data_points <- function(.fname) {
                   P2FirstSrvIn,
                   Speed_KMH,
                   Speed_MPH) |>
+                  # any_of("ServeNumber")) |>
     as_tibble()
 }
 
